@@ -23,3 +23,5 @@ Due to quirks of Powershell, when scheduling in Task Scheduler or otherwise runn
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -Command "C:\SnoozeGuard.ps1" -requiresDisplay "mstsc" -focusOnly 1 -oneTime 1
 ```
+To prevent the CMD pop-up from the task, make sure to select `Run whether user is logged on or not` option (and ideally `Do not store password`, too).  
+Unfortunately, I was not able to setup the task to be triggered `On Idle`: it just did not run, even though the scheduler showed, that it did (adjusting conditions did not do anything). But it runs fine if you set it up as `On schedule` and run it every X minutes. Or you can add the script to auto-start and let it run indefinitely, if that's your preference.
