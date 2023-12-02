@@ -17,3 +17,9 @@ Below example, will do the same, but will search for _either_ `mstsc` _or_ `note
 ```powershell
 SnoozeGuard.ps1 -requiresDisplay "mstsc", "notepad" -requiresSystem "handbrake" -focusOnly 0 -pollingRate 120 -oneTime 0
 ```
+
+## Scheduling
+Due to quirks of Powershell, when scheduling in Task Scheduler or otherwise running the file from CMD (not PowerShell itself), use `-Command` instead of `-File` to avoid `Cannot convert value "System.String" to type "System.Boolean"` error. LIke this:
+```
+powershell -NoProfile -ExecutionPolicy Bypass -Command "C:\SnoozeGuard.ps1" -requiresDisplay "mstsc" -focusOnly 1 -oneTime 1
+```
