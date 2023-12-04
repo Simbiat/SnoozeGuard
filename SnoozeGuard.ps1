@@ -3,7 +3,9 @@ param (
     [string[]]$requiresDisplay,
     [int]$pollingRate = 120,
     [bool]$focusOnly = $true,
-    [bool]$oneTime = $false
+    [bool]$oneTime = $false,
+    [bool]$debug = $false,
+    [string]$logFile
 )
 
 # Check if PowerState type is already defined (GPT suggests this, not sure why, since for me it does need to do this: possible for compatibility reasons?)
@@ -70,7 +72,7 @@ function SetExecutionState {
     $result = [NativeMethods]::SetThreadExecutionState($state)
 
     if ($result -eq 0) {
-        Write-Host "Error: Unable to set execution state." -ForegroundColor Red
+        LogToFile -logLine "Error: Unable to set execution state." -color Red
     }
 
     Get-StateNames -Value ([NativeMethods]::SetThreadExecutionState(0))  # Get the current state
@@ -82,16 +84,16 @@ function Get-StateNames {
     )
 
     if ($Value -band [PowerState]::ES_SYSTEM_REQUIRED -and $Value -band [PowerState]::ES_DISPLAY_REQUIRED) {
-        Write-Host "Fully awake" -ForegroundColor DarkGreen
+        LogToFile -logLine "Fully awake" -color DarkGreen
     }
     elseif ($Value -band [PowerState]::ES_SYSTEM_REQUIRED) {
-	Write-Host "System is awake" -ForegroundColor DarkYellow
+	LogToFile -logLine "System is awake" -color DarkYellow
     }
     elseif ($Value -band [PowerState]::ES_DISPLAY_REQUIRED) {
-	Write-Host "Display is awake" -ForegroundColor DarkBlue
+	LogToFile -logLine "Display is awake" -color DarkBlue
     }
     else {
-        Write-Host "Feeling sleepy" -ForegroundColor Gray
+        LogToFile -logLine "Feeling sleepy" -color Gray
     }
 }
 
@@ -101,10 +103,10 @@ function IsProcessRunning {
     )
 
     foreach ($name in $processName) {
-        Write-Host "Searching for ""$name""..." -ForegroundColor Gray
+        LogToFile -logLine "Searching for ""$name""..." -color Gray
         $process = Get-Process -Name $name -ErrorAction SilentlyContinue
         if ($process) {
-            Write-Host "Process ""$name"" found" -ForegroundColor Gray
+            LogToFile -logLine "Process ""$name"" found" -color Gray
             return $true
         }
     }
@@ -161,6 +163,35 @@ function IsProcessVisible {
     return $false
 }
 
+function LogToFile {
+    param (
+        [string]$logLine,
+        [ConsoleColor]$color = "Gray"
+    )
+
+    if ($debug) {
+        if ($logFile -ne $null -and $logFile -ne '' -and (Test-Path $logFile -IsValid -PathType Leaf)) {
+            $logFilePath = $logFile
+        } else {
+            # Get the directory of the script
+            $scriptDir = (Get-Item $MyInvocation.PSCommandPath).Directory.FullName
+
+            # Construct the log file path
+            $logFilePath = Join-Path $scriptDir "logfile.txt"
+        }
+
+        # Get the current timestamp
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+
+        # Your log message
+        $logMessage = "[$timestamp] $logLine"
+
+        # Write the log line to the file
+        Add-Content -Path $logFilePath -Value $logMessage -ErrorAction SilentlyContinue
+    }
+    Write-Host $logLine -ForegroundColor $color
+}
+
 while (($requiresSystem -ne $null -and $requiresSystem.Length -gt 0) -or ($requiresDisplay -ne $null -and $requiresDisplay.Length -gt 0)) {
     if (IsProcessRunning $requiresDisplay) {
         $executionState = [PowerState]::ES_SYSTEM_REQUIRED
@@ -168,7 +199,7 @@ while (($requiresSystem -ne $null -and $requiresSystem.Length -gt 0) -or ($requi
         foreach ($name in $requiresDisplay) {
             if (($focusOnly -and (IsProcessFocused $name)) -or (-not $focusOnly -and ((IsProcessFocused $name) -or (IsProcessVisible $name)))) {
 
-                Write-Host "Process ""$name"" wants display" -ForegroundColor Gray
+                LogToFile -logLine "Process ""$name"" wants display" -color Gray
                 $executionState = $executionState -bor [PowerState]::ES_DISPLAY_REQUIRED
                 break  # Exit the loop once one focused process is found
             }
@@ -178,15 +209,14 @@ while (($requiresSystem -ne $null -and $requiresSystem.Length -gt 0) -or ($requi
     } elseif (IsProcessRunning $requiresSystem) {
         SetExecutionState -esFlags ES_SYSTEM_REQUIRED
     } else {
-        Write-Host "No processes found" -ForegroundColor Gray
+        LogToFile -logLine "No processes found" -color Gray
+        # Release the execution state when the process is not running
+        SetExecutionState -esFlags ES_CONTINUOUS | Out-Null
     }
 
     if ($oneTime) {
-        break
+        exit 0
     } else {
         Start-Sleep -Seconds $pollingRate
     }
 }
-
-# Release the execution state when the process is not running
-SetExecutionState -esFlags ES_CONTINUOUS | Out-Null
