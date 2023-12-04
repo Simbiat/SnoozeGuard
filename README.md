@@ -21,22 +21,4 @@ SnoozeGuard.ps1 -requiresDisplay "mstsc", "notepad" -requiresSystem "handbrake" 
 ```
 
 ## Scheduling
-Due to quirks of Powershell, when scheduling in Task Scheduler or otherwise running the file from CMD (not PowerShell itself), use `-Command` instead of `-File` to avoid `Cannot convert value "System.String" to type "System.Boolean"` error. LIke this:
-```
-powershell -NoProfile -ExecutionPolicy Bypass -Command "C:\SnoozeGuard.ps1" -requiresDisplay "mstsc" -focusOnly 1 -oneTime 1
-```
-To prevent the CMD pop-up from the task, you will need to use VBS wrapper like this:
-```vbs
-Dim Args()
-ReDim Args(WScript.Arguments.Count - 1)
-
-For i = 0 To WScript.Arguments.Count - 1
-   Args(i) = """" & WScript.Arguments(i) & """"
-Next
-CreateObject("WScript.Shell").Run Join(Args), 0, False
-```
-Then you will need to schedule a call of `wscript.exe` with parameters like below (`invisible.vbs` is path to the VBS file):
-```
-"invisible.vbs" powershell -NoProfile -ExecutionPolicy Bypass -Command "C:\SnoozeGuard.ps1" -requiresDisplay "mstsc" -focusOnly 1 -oneTime 1
-```
-Unfortunately, I was not able to setup the task to be triggered `On Idle`: it just did not run, even though the scheduler showed, that it did (adjusting conditions did not do anything). But it runs fine if you set it up as `On schedule` and run it every X minutes. Or you can add the script to auto-start and let it run indefinitely, if that's your preference.
+I was not able to make this work without an obvious powershell terminal flashing or constantly showing. All known methods of hiding the powershell terminal (wrapping in VBS, running regardless of whether user is logged in) result in the state not being updated, even though logs indicate that script was run successfully. If you do manage to make this work somehow, please, submit a PR for this README file (and the script itself, if required).
